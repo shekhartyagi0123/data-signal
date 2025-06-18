@@ -7,21 +7,23 @@ app = Flask(__name__)
 # Load the trained model
 model = joblib.load("signal_lamp_predictive_model.pkl")
 
-# Define the prediction route
+# Define the prediction endpoint
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.get_json()
 
-    # Convert input JSON to DataFrame
+    # Convert JSON to DataFrame
     input_df = pd.DataFrame([data])
 
-    # Ensure columns match training
+    # Reorder columns to match training features
     expected_cols = model.feature_names_in_
     input_df = input_df.reindex(columns=expected_cols, fill_value=0)
 
-    # Predict
+    # Perform prediction
     prediction = model.predict(input_df)[0]
+
     return jsonify({"prediction": int(prediction)})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 👇 Change port to 5000 or any other custom port
+    app.run(host='0.0.0.0', port=5000, debug=True)
