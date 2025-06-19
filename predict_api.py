@@ -4,32 +4,36 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# Load trained model
+# Load the trained model
 model = joblib.load("signal_lamp_predictive_model.pkl")
-
-# Manual threshold limits (from your Signal Lamp form)
-MIN_CURRENT = 100
-MAX_CURRENT = 150
-MIN_VOLTAGE = 100
-MAX_VOLTAGE = 120
 
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.get_json()
 
-    # Hybrid Rule-Based Check
-    if (data["Current_clean"] < MIN_CURRENT or data["Current_clean"] > MAX_CURRENT or
-        data["Voltage_clean"] < MIN_VOLTAGE or data["Voltage_clean"] > MAX_VOLTAGE):
-        return jsonify({"prediction": 1, "reason": "Threshold breach"})
-
-    # Convert to DataFrame for ML
+    # Convert input to DataFrame
     input_df = pd.DataFrame([data])
-    input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
-    # ML Prediction
-    prediction = model.predict(input_df)[0]
+    # Match training feature columns
+    expected_cols = model.feature_names_in_
+    input_df = input_df.reindex(columns=expected_cols, fill_value=0)
 
-    return jsonify({"prediction": int(prediction), "reason": "ML model"})
+    # Predict alert using ML model
+    alert_prediction = model.predict(input_df)[0]
+
+    # Get failure_count_last_10 from input JSON
+    failure_count = data.get("failure_count_last_10", 0)
+
+    # Predictive alert logic
+    predictive_alert = 1 if failure_count >= 4 else 0
+
+    # ✅ Return everything including failure count
+    return jsonify({
+        "prediction": int(alert_prediction),
+        "predictive_alert": predictive_alert,
+        "failure_count_last_10": failure_count
+    })
 
 if __name__ == '__main__':
+    # Change port if needed
     app.run(host='0.0.0.0', port=5000, debug=True)
